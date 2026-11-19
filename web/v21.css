@@ -1,0 +1,5 @@
+.checkpoint{margin-top:35px;border-top:1px solid var(--line);padding-top:28px}
+.checkpoint img{display:block;width:100%;margin:12px 0 18px;border:1px solid #6e6760;background:#fff}
+.checkpoint-actions{display:flex;gap:10px}.checkpoint-actions .primary{flex:1}.checkpoint-actions .ghost{white-space:nowrap}
+.override{display:flex;gap:9px;align-items:flex-start;margin-top:16px;padding:13px;background:#3b302a;border:1px solid #765c4c;color:#f2d1bc;font-size:12px;line-height:1.45}.override input{margin-top:2px}
+@media(max-width:500px){.checkpoint-actions{display:block}.checkpoint-actions>*{width:100%;margin-bottom:10px}}

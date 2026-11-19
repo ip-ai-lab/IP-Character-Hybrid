@@ -12,10 +12,12 @@ export default async function handler(request) {
   if (!workerURL || !workerToken || !accessCode) return json({ error: 'Server configuration incomplete: VAULT_WORKER_URL, VAULT_WORKER_TOKEN and VAULT_ACCESS_CODE are required.' }, 503);
   if (request.headers.get('x-vault-access-code') !== accessCode) return json({ error: 'Invalid studio access code.' }, 401);
   const url = new URL(request.url);
-  const match = url.pathname.match(/(?:\/api\/|\/proxy\/)(jobs(?:\/[a-f0-9-]+(?:\/result)?)?|health|capabilities)$/);
+  const match = url.pathname.match(/(?:\/api\/|\/proxy\/)(jobs(?:\/[a-f0-9-]+(?:\/(?:result|identity))?)?|health|capabilities)$/);
   if (!match) return json({ error: 'Unknown endpoint.' }, 404);
   const path = match[1];
-  const allowed = (path === 'health' || path === 'capabilities') ? request.method === 'GET' : (path === 'jobs' ? request.method === 'POST' : request.method === 'GET');
+  const allowed = (path === 'health' || path === 'capabilities') ? request.method === 'GET'
+    : (path === 'jobs' ? request.method === 'POST'
+    : (path.endsWith('/identity') ? ['GET','POST'].includes(request.method) : request.method === 'GET'));
   if (!allowed) return json({ error: 'Method not allowed.' }, 405);
   let upstreamURL;
   try {

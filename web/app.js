@@ -1,3 +1,4 @@
+const v21Styles=document.createElement('link');v21Styles.rel='stylesheet';v21Styles.href='/v21.css';document.head.append(v21Styles);
 const $ = (x) => document.getElementById(x);
 const form = $('vault-form');
 const activity = $('activity');
@@ -7,7 +8,7 @@ let pollTimer = null;
 let currentJob = null;
 let extracted = null;
 let capabilities = null;
-const modeExplanations={economy:'Fast prototype: generic img2img; some panels reused and full-body accuracy is limited.', balanced:'Requires InstantID + SDXL OpenPose ControlNet in ComfyUI; all poses and expressions generated separately.',studio:'Adds local InsightFace similarity review and selective retries (up to 3 renders per low-quality panel).'};
+const modeExplanations={economy:'Fast prototype: generic img2img; some panels reused and identity may remain unscored.', balanced:'InstantID + OpenPose with local identity scoring and an approval checkpoint before the full render.',studio:'Balanced workflow plus selective retries (up to 3 attempts for a panel that fails review).'};
 $('mode').addEventListener('change',()=>{$('mode-help').textContent=modeExplanations[$('mode').value]});
 
 function accessCode() {
@@ -79,9 +80,23 @@ async function waitForJob(id){
   const job=await res.json();
   activityUpdate(job.state==='completed'?'Character sheet ready':job.state==='failed'?'Generation stopped':job.state==='analyzing'?'Analyzing your reference':'Building character continuity',job.progress||0,job.message||'',job.state==='failed'?job.error||'Worker failed.':'');
   if(job.state==='failed'){submit.disabled=false;return;}
+  if(job.state==='awaiting_identity_approval'){
+    stopPolling();submit.disabled=false;
+    const gate=job.identity_gate||{};const status=gate.status||'unscored';
+    $('identity-summary').textContent=status==='passed'
+      ? `Automatic identity score: PASSED. Pack time: ${gate.elapsed_seconds||'?'} seconds. Please visually confirm before spending time on the remaining panels.`
+      : `Automatic identity score: ${status.toUpperCase()}. The full render is paused. Reject this pack, or explicitly override after reviewing it.`;
+    $('override-row').classList.toggle('hidden',!gate.requires_override);
+    $('identity-override').checked=false;
+    const preview=await api('jobs/'+id+'/identity');const blob=await preview.blob();
+    $('identity-image').src=URL.createObjectURL(blob);$('identity-checkpoint').classList.remove('hidden');
+    $('identity-checkpoint').scrollIntoView({behavior:'smooth',block:'start'});return;
+  }
   if(job.state==='completed'){
     submit.disabled=false;extracted=job.extracted||{};
     $('metadata').textContent=JSON.stringify(extracted,null,2);$('review-report').textContent=JSON.stringify(job.review||{notice:'No consistency reviewer was used.'},null,2);
+    const seconds=job.timing?.total_seconds;
+    if(seconds)$('activity-subtitle').textContent=`Completed in ${Math.floor(seconds/60)}m ${Math.round(seconds%60)}s. Review flagged panels below.`;
     const image=await api('jobs/'+id+'/result');const blob=await image.blob();const url=URL.createObjectURL(blob);
     $('result-image').src=url;$('download').href=url;$('download').download=(job.character_name||'character').replace(/[^\w-]/g,'-').toLowerCase()+'-continuity-sheet.png';$('result').classList.remove('hidden');
     $('result').scrollIntoView({behavior:'smooth',block:'start'});return;
@@ -89,7 +104,7 @@ async function waitForJob(id){
   pollTimer=setTimeout(()=>waitForJob(id).catch(e=>{activityUpdate('Connection issue',0,'Could not check the worker.',e.message);submit.disabled=false}),3000);
 }
 form.addEventListener('submit',async (event)=>{
-  event.preventDefault();stopPolling();$('result').classList.add('hidden');
+  event.preventDefault();stopPolling();$('result').classList.add('hidden');$('identity-checkpoint').classList.add('hidden');
   if(!compressedFile){alert('Upload a reference image first.');return;}
   submit.disabled=true;activityUpdate('Preparing image',3,'Connecting to your hybrid AI worker…');
   try{
@@ -100,7 +115,26 @@ form.addEventListener('submit',async (event)=>{
     await waitForJob(currentJob);
   }catch(e){submit.disabled=false;activityUpdate('Could not start generation',0,'Check your studio connection.',e.message);}
 });
+async function identityAction(action){
+  if(!currentJob)return;
+  const gateOverride=$('identity-override').checked;
+  if(action==='approve' && !$('override-row').classList.contains('hidden') && !gateOverride){
+    alert('Tick the manual override only if you have visually reviewed this failed or unscored pack.');return;
+  }
+  $('approve-identity').disabled=true;$('reject-identity').disabled=true;
+  try{
+    const fd=new FormData();fd.set('action',action);fd.set('override',String(gateOverride));
+    await api('jobs/'+currentJob+'/identity',{method:'POST',body:fd});
+    $('identity-checkpoint').classList.add('hidden');
+    if(action==='approve'){
+      submit.disabled=true;activityUpdate('Identity approved',44,'Rendering the remaining panels…');await waitForJob(currentJob);
+    }else{activityUpdate('Stopped after identity review',0,'No remaining panels were rendered.','Identity pack rejected.');submit.disabled=false;}
+  }catch(e){activityUpdate('Identity action failed',42,'The full render remains paused.',e.message);}
+  finally{$('approve-identity').disabled=false;$('reject-identity').disabled=false;}
+}
+$('approve-identity').onclick=()=>identityAction('approve');
+$('reject-identity').onclick=()=>identityAction('reject');
 $('copy-metadata').onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(extracted||{},null,2));$('copy-metadata').textContent='Copied ✓';setTimeout(()=>$('copy-metadata').textContent='Copy extracted JSON',1600)};
-$('restart').onclick=()=>{stopPolling();$('result').classList.add('hidden');activity.classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})};
+$('restart').onclick=()=>{stopPolling();$('result').classList.add('hidden');$('identity-checkpoint').classList.add('hidden');activity.classList.add('hidden');window.scrollTo({top:0,behavior:'smooth'})};
 // Don't eagerly show a credential prompt. Status gets checked after the first user action.
 $('backend-pill').addEventListener('click',ping);

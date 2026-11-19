@@ -1,5 +1,14 @@
 # IP Character Vault — Hybrid / No Paid AI API Edition
 
+## v2.1 identity-first upgrade
+
+Balanced and Studio now render an identity pack first, score both generated
+anchors locally, and wait for visual approval before rendering the remaining
+panels. Results use explicit `passed`, `failed`, `unscored`, or
+`not_applicable` states; a missing score is never reported as a pass. Source
+face details use detected landmarks, while the original reference is contained
+without a destructive fixed crop. See `DEPLOY_V2.1.md` for the Windows update.
+
 **A working application source package**, not an already-deployed service. Premium static frontend on Netlify, authenticated serverless proxy, and an independent Python worker that runs inference through local Ollama and ComfyUI. The worker can optionally call a compatible Gradio Space for image generation instead of local ComfyUI.
 
 ### What is actually free?

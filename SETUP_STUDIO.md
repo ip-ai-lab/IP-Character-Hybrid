@@ -1,4 +1,4 @@
-# IP Character Vault Hybrid v2.0 — Windows quality upgrade
+# IP Character Vault Hybrid v2.1 — Windows quality and performance upgrade
 
 This upgrade keeps **Netlify + Cloudflare Tunnel + FastAPI worker + Ollama + ComfyUI**. No paid OpenAI API is required. It does **not** include model weights, pretrained InsightFace models, or commercial use rights. **The code has been tested with simulated ComfyUI responses, not with your actual local GPU**; follow these steps to make Balanced and Studio functional.
 
@@ -81,7 +81,7 @@ Studio compares detected face embeddings with the original reference using a **l
 Install packages into the **Vault worker `.venv`** (not the ComfyUI interpreter):
 
 ```powershell
-.\.venv\Scripts\python.exe -m pip install numpy insightface onnxruntime
+.\.venv\Scripts\python.exe -m pip install -r .\worker\requirements-quality.txt
 ```
 
 InsightFace can require C++ build tools on Windows and may be difficult to install. A supported wheel or build tools may be needed for Python 3.12. Use only trusted installation sources. Set `INSIGHTFACE_ROOT` to the directory containing `models/antelopev2` if it is not in the default path:
